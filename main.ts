@@ -1,137 +1,263 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+// TODO: replace `any` types with type definitions
+import { App, Plugin, PluginSettingTab } from 'obsidian';
+import QRious from 'qrious';
 
-// Remember to rename these classes and interfaces!
-
-interface MyPluginSettings {
-	mySetting: string;
+const CLIENT_TYPE = 'web';  // TODO: create an integration client type with read access
+const MATTER_API_VERSION = 'v11';
+const MATTER_API_DOMAIN = 'api.getmatter.app'
+const MATTER_API_HOST = `https://${MATTER_API_DOMAIN}/api/${MATTER_API_VERSION}`;
+const ENDPOINTS = {
+  QR_LOGIN_TRIGGER: `${MATTER_API_HOST}/qr_login/trigger/`,
+  QR_LOGIN_EXCHANGE: `${MATTER_API_HOST}/qr_login/exchange/`,
+  REFRESH_TOKEN_EXCHANGE: `${MATTER_API_HOST}/token/refresh/`,
+  HIGHLIGHTS_FEED: `${MATTER_API_HOST}/library_items/highlights_feed/`
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+interface MatterSettings {
+  accessToken: string | null;
+  refreshToken: string | null;
+  qrSessionToken: string | null;
+  dataDir: string | null;
+  refreshInterval: number;
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
-
-	async onload() {
-		await this.loadSettings();
-
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
-
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-			}
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-	}
-
-	onunload() {
-
-	}
-
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
+const DEFAULT_SETTINGS: MatterSettings = {
+  accessToken: null,
+  refreshToken: null,
+  qrSessionToken: null,
+  dataDir: "Matter",
+  refreshInterval: 1,
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
+export default class MatterPlugin extends Plugin {
+  settings: MatterSettings;
 
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
+  async onload() {
+    await this.loadSettings();
+    this.addSettingTab(new MatterSettingsTab(this.app, this));
+    this.loopSync();
+  }
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
+  onunload() {
+  }
+
+  async loopSync() {
+    if (this.settings.accessToken) {
+      this.sync();
+    }
+
+    await sleep(this.settings.refreshInterval * 60 * 1000);
+    this.loopSync();
+  }
+
+  async loadSettings() {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+  }
+
+  async saveSettings() {
+    await this.saveData(this.settings);
+  }
+
+  async sync() {
+    // TODO: optimize by only updating entries since last sync.
+    if (this.settings.accessToken) {
+      let url = ENDPOINTS.HIGHLIGHTS_FEED
+      while (url !== null) {
+        const response = await this._authedRequest(url);
+        await this._handleFeed(response.feed);
+        url = response.next;
+      }
+    }
+  }
+
+  private async _authedRequest(url: string) {
+    try {
+      return (await authedRequest(this.settings.accessToken, url));
+    } catch(e) {
+      // TODO: verify status code before retrying
+      await this._refreshTokenExchange();
+      return (await authedRequest(this.settings.accessToken, url));
+    }
+  }
+
+  private async _refreshTokenExchange() {
+    const headers = new Headers();
+    headers.set('Content-Type', 'application/json');
+    const response = await fetch(ENDPOINTS.REFRESH_TOKEN_EXCHANGE, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ refresh_token: this.settings.refreshToken })
+    });
+    const payload = await response.json();
+    this.settings.accessToken = payload.access_token;
+    this.settings.refreshToken = payload.refresh_token;
+    this.saveSettings();
+  }
+
+  private async _handleFeed(feed: any[])  {
+    feed.forEach(async (feedEntry) => (await this._handleFeedEntry(feedEntry)));
+  }
+
+  private async _handleFeedEntry(feedEntry: any) {
+    const fs = this.app.vault.adapter;
+    if (!(await fs.exists(this.settings.dataDir))) {
+      fs.mkdir(this.settings.dataDir);
+    }
+
+    const entryPath = `${this.settings.dataDir}/${toFilename(feedEntry.content.title)}.md`;
+    await fs.write(entryPath, this._renderFeedEntry(feedEntry));
+  }
+
+  private _renderFeedEntry(feedEntry: any): string {
+    const publicationDate = new Date(feedEntry.content.publication_date);
+    const annotations = feedEntry.content.my_annotations.sort((a: any, b: any) => a.word_start - b.word_start);
+    // TODO: find a better of handling templates
+    return `
+## Metadata
+* URL: [${feedEntry.content.url}](${feedEntry.content.url})
+* Published Date: [[${publicationDate.toISOString().slice(0, 10)}]]
+${feedEntry.content.author ? `* Author: [[${feedEntry.content.author.any_name}]]\n` : ''}
+## Highlights
+${annotations.map(this._renderAnnotation).join("\n")}
+`.trim();
+  }
+
+  private _renderAnnotation(annotation: any) {
+    return `
+* ${annotation.text}${annotation.note ? `
+  * **Note**: ${annotation.note}`: ''}
+`.trim()
+  }
 }
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+class MatterSettingsTab extends PluginSettingTab {
+  // TODO: allow the user to stop syncing & sign out
+  plugin: MatterPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
+  constructor(app: App, plugin: MatterPlugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
 
-	display(): void {
-		const {containerEl} = this;
+  display(): void {
+    const { containerEl } = this;
+    containerEl.empty();
+    this.loadInterface();
+  }
 
-		containerEl.empty();
+  loadInterface(): void {
+    const { containerEl } = this;
+    containerEl.createEl('h2', { text: 'Matter' });
 
-		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
+    if (!this.plugin.settings.accessToken) {
+      this.displayLogin();
+    } else {
+      containerEl.createEl('h3', { text: 'Authenticated!' });
+    }
+  }
 
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					console.log('Secret: ' + value);
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
-	}
+  async displayLogin(): Promise<void> {
+    const { containerEl } = this;
+
+    this.plugin.settings.accessToken = null;
+    this.plugin.settings.refreshToken = null;
+    this.plugin.settings.qrSessionToken = null;
+    this.plugin.saveSettings();
+
+    try {
+      const headers = new Headers();
+      headers.set('Content-Type', 'application/json');
+
+      const triggerResponse = await fetch(ENDPOINTS.QR_LOGIN_TRIGGER, {
+        method: "POST",
+        body: JSON.stringify({ client_type: CLIENT_TYPE }),
+        headers,
+      });
+      this.plugin.settings.qrSessionToken = (await triggerResponse.json()).session_token;
+    } catch (error) {
+      return;
+    }
+
+    const canvas = document.createElement('canvas');
+    containerEl.appendChild(canvas);
+
+    new QRious({
+      element: canvas,
+      value: this.plugin.settings.qrSessionToken,
+    });
+
+    const { access_token, refresh_token } = await this._pollQRLoginExchange();
+    if (access_token) {
+      this.plugin.settings.accessToken = access_token;
+      this.plugin.settings.refreshToken = refresh_token;
+      this.plugin.saveSettings();
+      this.display();
+    }
+  }
+
+  displayInitialSetup() {
+    const { containerEl } = this;
+    containerEl.createEl('h3', { text: 'Initial Setup' });
+  }
+
+  private async _pollQRLoginExchange() {
+    if (!this.plugin.settings.qrSessionToken) {
+      return;
+    }
+
+    let attempts = 0;
+    while (attempts < 300) {
+      try {
+        const response = await this._qrLoginExchange(this.plugin.settings.qrSessionToken);
+        const loginSession = await response.json();
+        if (loginSession?.access_token) {
+          return {
+            access_token: loginSession.access_token,
+            refresh_token: loginSession.refresh_token,
+          };
+        }
+      } catch(e) {
+        // TODO: handle
+      } finally {
+        attempts++;
+        await sleep(1000);
+      }
+    }
+  }
+
+  private async _qrLoginExchange(session_token: string): Promise<any> {
+    const headers = new Headers();
+    headers.set('Content-Type', 'application/json');
+    return await fetch(ENDPOINTS.QR_LOGIN_EXCHANGE, {
+      method: "POST",
+      body: JSON.stringify({
+        session_token
+      }),
+      headers,
+    });
+  }
+}
+
+const authedRequest = async(
+  accessToken: string,
+  url: string,
+  fetchArgs: RequestInit = {},
+) => {
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${accessToken}`);
+  headers.set('Content-Type', 'application/json');
+
+  const response = await fetch(url, {
+    ...fetchArgs,
+    headers,
+  });
+  return response.json()
+}
+
+const sleep = (ms: number): Promise<void> => {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+const toFilename = (s: string): string => {
+  return s.replace(/[/\\?%*:|"<>]/g, '-');
 }
