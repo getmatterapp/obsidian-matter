@@ -1,5 +1,5 @@
 // TODO: replace `any` types with type definitions
-import { App, Plugin, PluginSettingTab } from 'obsidian';
+import { App, ButtonComponent, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import QRious from 'qrious';
 
 const CLIENT_TYPE = 'web';  // TODO: create an integration client type with read access
@@ -19,6 +19,7 @@ interface MatterSettings {
   qrSessionToken: string | null;
   dataDir: string | null;
   refreshInterval: number;
+  hasCompletedInitialSetup: boolean;
 }
 
 const DEFAULT_SETTINGS: MatterSettings = {
@@ -26,7 +27,8 @@ const DEFAULT_SETTINGS: MatterSettings = {
   refreshToken: null,
   qrSessionToken: null,
   dataDir: "Matter",
-  refreshInterval: 1,
+  refreshInterval: .1,
+  hasCompletedInitialSetup: false,
 }
 
 export default class MatterPlugin extends Plugin {
@@ -42,7 +44,7 @@ export default class MatterPlugin extends Plugin {
   }
 
   async loopSync() {
-    if (this.settings.accessToken) {
+    if (this.settings.accessToken && this.settings.hasCompletedInitialSetup) {
       this.sync();
     }
 
@@ -91,7 +93,7 @@ export default class MatterPlugin extends Plugin {
     const payload = await response.json();
     this.settings.accessToken = payload.access_token;
     this.settings.refreshToken = payload.refresh_token;
-    this.saveSettings();
+    await this.saveSettings();
   }
 
   private async _handleFeed(feed: any[])  {
@@ -147,9 +149,9 @@ class MatterSettingsTab extends PluginSettingTab {
 
   loadInterface(): void {
     const { containerEl } = this;
-    containerEl.createEl('h2', { text: 'Matter' });
+    containerEl.createEl('h1', { text: 'Matter' });
 
-    if (!this.plugin.settings.accessToken) {
+    if (!this.plugin.settings.accessToken || !this.plugin.settings.hasCompletedInitialSetup) {
       this.displayLogin();
     } else {
       containerEl.createEl('h3', { text: 'Authenticated!' });
@@ -158,11 +160,6 @@ class MatterSettingsTab extends PluginSettingTab {
 
   async displayLogin(): Promise<void> {
     const { containerEl } = this;
-
-    this.plugin.settings.accessToken = null;
-    this.plugin.settings.refreshToken = null;
-    this.plugin.settings.qrSessionToken = null;
-    this.plugin.saveSettings();
 
     try {
       const headers = new Headers();
@@ -178,26 +175,57 @@ class MatterSettingsTab extends PluginSettingTab {
       return;
     }
 
-    const canvas = document.createElement('canvas');
-    containerEl.appendChild(canvas);
+    const setting = new Setting(containerEl)
+      .setName('Scan this QR code in the Matter app')
+      .setDesc('Go to Profile > Settings > Connected Accounts > Obsidian');
 
-    new QRious({
-      element: canvas,
-      value: this.plugin.settings.qrSessionToken,
-    });
+    if (!this.plugin.settings.accessToken) {
+      const canvas = document.createElement('canvas');
+      canvas.className = 'matter-qr';
+      setting.settingEl.appendChild(canvas);
+
+      new QRious({
+        element: canvas,
+        value: this.plugin.settings.qrSessionToken,
+        size: 80,
+        backgroundAlpha: 0.2,
+      });
+    } else {
+      const authConfirmation = document.createElement('p');
+      authConfirmation.className = 'matter-auth-confirmation';
+      authConfirmation.appendText('✅');
+      setting.settingEl.appendChild(authConfirmation);
+    }
+
+    new Setting(containerEl)
+			.setName('Matter Sync Folder')
+			.setDesc('Where do you want your Matter data to live in Obsidian?')
+			.addText(text => text
+				.setPlaceholder('Enter location')
+				.setValue(this.plugin.settings.dataDir)
+				.onChange(async (value) => {
+					this.plugin.settings.dataDir = value;
+					await this.plugin.saveSettings();
+				}));
+
+    new ButtonComponent(containerEl)
+      .setButtonText('Start Syncing')
+      .setClass('matter-setup-btn')
+      .setDisabled(!this.plugin.settings.accessToken)
+      .onClick(async () => {
+        this.plugin.settings.hasCompletedInitialSetup = true;
+        await this.plugin.saveSettings();
+        this.plugin.loopSync();
+        this.display();
+      });
 
     const { access_token, refresh_token } = await this._pollQRLoginExchange();
     if (access_token) {
       this.plugin.settings.accessToken = access_token;
       this.plugin.settings.refreshToken = refresh_token;
-      this.plugin.saveSettings();
+      await this.plugin.saveSettings();
       this.display();
     }
-  }
-
-  displayInitialSetup() {
-    const { containerEl } = this;
-    containerEl.createEl('h3', { text: 'Initial Setup' });
   }
 
   private async _pollQRLoginExchange() {
