@@ -1,5 +1,5 @@
 // TODO: replace `any` types with type definitions
-import { App, ButtonComponent, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, ButtonComponent, DropdownComponent, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import QRious from 'qrious';
 
 const CLIENT_TYPE = 'web';  // TODO: create an integration client type with read access
@@ -27,7 +27,7 @@ const DEFAULT_SETTINGS: MatterSettings = {
   refreshToken: null,
   qrSessionToken: null,
   dataDir: "Matter",
-  refreshInterval: .1,
+  refreshInterval: 1,
   hasCompletedInitialSetup: false,
 }
 
@@ -63,12 +63,14 @@ export default class MatterPlugin extends Plugin {
   async sync() {
     // TODO: optimize by only updating entries since last sync.
     if (this.settings.accessToken) {
+      new Notice('Syncing with Matter');
       let url = ENDPOINTS.HIGHLIGHTS_FEED
       while (url !== null) {
         const response = await this._authedRequest(url);
         await this._handleFeed(response.feed);
         url = response.next;
       }
+      new Notice('Finished syncing with Matter');
     }
   }
 
@@ -152,13 +154,13 @@ class MatterSettingsTab extends PluginSettingTab {
     containerEl.createEl('h1', { text: 'Matter' });
 
     if (!this.plugin.settings.accessToken || !this.plugin.settings.hasCompletedInitialSetup) {
-      this.displayLogin();
+      this.displaySetup();
     } else {
-      containerEl.createEl('h3', { text: 'Authenticated!' });
+      this.displaySettings();
     }
   }
 
-  async displayLogin(): Promise<void> {
+  async displaySetup(): Promise<void> {
     const { containerEl } = this;
 
     try {
@@ -226,6 +228,42 @@ class MatterSettingsTab extends PluginSettingTab {
       await this.plugin.saveSettings();
       this.display();
     }
+  }
+
+  async displaySettings() {
+    const { containerEl } = this;
+
+    new Setting(containerEl)
+			.setName('Sync with Matter')
+			.setDesc('Manually start a sync with Matter')
+      .addButton(button => button
+        .setButtonText('Sync')
+        .onClick(async () => await this.plugin.sync()));
+
+    new Setting(containerEl)
+			.setName('Matter Sync Folder')
+			.setDesc('Where do you want your Matter data to live in Obsidian?')
+			.addText(text => text
+				.setPlaceholder('Enter location')
+				.setValue(this.plugin.settings.dataDir)
+				.onChange(async (value) => {
+					this.plugin.settings.dataDir = value;
+					await this.plugin.saveSettings();
+				}));
+
+    new Setting(containerEl)
+			.setName('Sync Frequency')
+			.setDesc('How often should Obsidian sync with Matter?')
+      .addDropdown(dropdown => dropdown
+        .addOption("60", "Every hour")
+        .addOption("720", "Every 12 hours")
+        .addOption("1440", "Every 24 hours")
+        .setValue(this.plugin.settings.refreshInterval.toString())
+        .onChange(async (val) => {
+          this.plugin.settings.refreshInterval = parseInt(val)
+          await this.plugin.saveSettings()
+        })
+      );
   }
 
   private async _pollQRLoginExchange() {
