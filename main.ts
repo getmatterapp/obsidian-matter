@@ -47,8 +47,16 @@ export default class MatterPlugin extends Plugin {
     // Reset isSyncing when the plugin is loaded.
     this.settings.isSyncing = false;
     await this.saveSettings();
-    await this.sync();
 
+    // Sync on load
+    if (
+      this.settings.accessToken
+      && this.settings.hasCompletedInitialSetup
+    ) {
+      await this.sync();
+    }
+
+    // Set up sync interval
     setInterval(async () => {
       await this.loopSync();
     }, LOOP_SYNC_INTERVAL);
@@ -235,27 +243,20 @@ class MatterSettingsTab extends PluginSettingTab {
       return;
     }
 
-    const setting = new Setting(containerEl)
+    const qrSetting = new Setting(containerEl)
       .setName('Scan this QR code in the Matter app')
       .setDesc('Go to Profile > Settings > Connected Accounts > Obsidian');
 
-    if (!this.plugin.settings.accessToken) {
-      const canvas = document.createElement('canvas');
-      canvas.className = 'matter-qr';
-      setting.settingEl.appendChild(canvas);
+    const canvas = document.createElement('canvas');
+    canvas.className = 'matter-qr';
+    qrSetting.settingEl.appendChild(canvas);
 
-      new QRious({
-        element: canvas,
-        value: this.plugin.settings.qrSessionToken,
-        size: 80,
-        backgroundAlpha: 0.2,
-      });
-    } else {
-      const authConfirmation = document.createElement('p');
-      authConfirmation.className = 'matter-auth-confirmation';
-      authConfirmation.appendText('✅');
-      setting.settingEl.appendChild(authConfirmation);
-    }
+    new QRious({
+      element: canvas,
+      value: this.plugin.settings.qrSessionToken,
+      size: 80,
+      backgroundAlpha: 0.2,
+    });
 
     new Setting(containerEl)
       .setName('Matter Sync Folder')
@@ -269,13 +270,14 @@ class MatterSettingsTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }));
 
-    new ButtonComponent(containerEl)
+    const startBtn = new ButtonComponent(containerEl)
       .setButtonText('Start Syncing')
       .setClass('matter-setup-btn')
-      .setDisabled(!this.plugin.settings.accessToken)
+      .setDisabled(true)
       .onClick(async () => {
         this.plugin.settings.hasCompletedInitialSetup = true;
         await this.plugin.saveSettings();
+        this.plugin.sync();
         this.plugin.loopSync();
         this.display();
       });
@@ -285,7 +287,13 @@ class MatterSettingsTab extends PluginSettingTab {
       this.plugin.settings.accessToken = access_token;
       this.plugin.settings.refreshToken = refresh_token;
       await this.plugin.saveSettings();
-      this.display();
+
+      canvas.remove();
+      const authConfirmation = document.createElement('p');
+      authConfirmation.className = 'matter-auth-confirmation';
+      authConfirmation.appendText('✅');
+      qrSetting.settingEl.appendChild(authConfirmation);
+      startBtn.setDisabled(false);
     }
   }
 
@@ -334,7 +342,7 @@ class MatterSettingsTab extends PluginSettingTab {
     }
 
     let attempts = 0;
-    while (attempts < 300) {
+    while (attempts < 600) {
       try {
         const response = await this._qrLoginExchange(this.plugin.settings.qrSessionToken);
         const loginSession = await response.json();
