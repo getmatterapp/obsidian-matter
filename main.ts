@@ -155,7 +155,7 @@ export default class MatterPlugin extends Plugin {
   private _appendAnnotations(feedEntry: any, content: string, after: Date): string {
     const newAnnotations = feedEntry.content.my_annotations.filter((a: any) => new Date(a.created_date) > after);
     if (!newAnnotations.length) {
-      return;
+      return content;
     }
 
     if (content[-1] !== '\n') {
