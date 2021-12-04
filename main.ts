@@ -19,6 +19,7 @@ import { toFilename } from './utils';
 const LOOP_SYNC_INTERVAL = 1000;  // TODO: increase to 1 minute
 
 export default class MatterPlugin extends Plugin {
+  intervalRef: NodeJS.Timer;
   settings: MatterSettings;
 
   async onload() {
@@ -38,13 +39,15 @@ export default class MatterPlugin extends Plugin {
     }
 
     // Set up sync interval
-    setInterval(async () => {
+    this.intervalRef = setInterval(async () => {
       await this.loopSync();
     }, LOOP_SYNC_INTERVAL);
   }
 
   onunload() {
-    return;
+    if (this.intervalRef) {
+      clearInterval(this.intervalRef);
+    }
   }
 
   async loadSettings() {
