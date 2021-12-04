@@ -5,7 +5,12 @@
   ],
   "jsRules": {},
   "rules": {
-    "no-any": "error"
+    "no-any": {
+      "severity": "error"
+    },
+    "no-unused-expression": {
+      "severity": "off"
+    }
   },
   "rulesDirectory": [],
   "linterOptions": {

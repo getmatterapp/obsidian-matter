@@ -76,16 +76,11 @@ export default class MatterPlugin extends Plugin {
     await this.saveSettings();
 
     try {
-      /* tslint:disable-next-line */
       new Notice('Syncing with Matter');
-
       await this._pageAnnotations();
       this.settings.lastSync = new Date();
-
-      /* tslint:disable-next-line */
       new Notice('Finished syncing with Matter');
     } catch (error) {
-      /* tslint:disable-next-line */
       new Notice('There was a problem syncing with Matter, try again later.');
     }
 
@@ -166,7 +161,6 @@ export default class MatterPlugin extends Plugin {
     }
 
     const annotations = feedEntry.content.my_annotations.sort((a, b) => a.word_start - b.word_start);
-    // TODO: find a better of handling templates
     return `
 ## Metadata
 * URL: [${feedEntry.content.url}](${feedEntry.content.url})

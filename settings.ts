@@ -1,6 +1,7 @@
 import {
   App,
   ButtonComponent,
+  Notice,
   PluginSettingTab,
   Setting,
 } from 'obsidian';
@@ -145,17 +146,49 @@ export class MatterSettingsTab extends PluginSettingTab {
           await this.plugin.sync()
         }));
 
+    let newDataDir = this.plugin.settings.dataDir;
     new Setting(containerEl)
       .setName('Matter Sync Folder')
-      .setDesc('Where do you want your Matter data to live in Obsidian?')
+      .setDesc('Where do you want your Matter data to live in Obsidian? Once you click "Apply" all of your current data will be moved')
       .addText(text => text
         .setPlaceholder('Enter location')
-        .setValue(this.plugin.settings.dataDir)
+        .setValue(newDataDir)
         .onChange(async (value) => {
-          // TODO: move all data to the new directory
           value = value.replace(/^\/+|\/+$/g, '');
-          await this.plugin.saveSettings();
-        }));
+          newDataDir = value
+        }))
+        .addButton(button => button
+          .setButtonText('Apply')
+          .onClick(async () => {
+            if (newDataDir === this.plugin.settings.dataDir) {
+              return;
+            }
+
+            if (this.plugin.settings.isSyncing) {
+              new Notice("Wait for the current sync to end and try again.")
+              return;
+            }
+
+            // Temporarily disable sync
+            this.plugin.settings.isSyncing = true;
+            await this.plugin.saveSettings();
+
+            // Copy over the current data to the new vault location
+            const fs = this.plugin.app.vault.adapter;
+            try {
+              await fs.rename(this.plugin.settings.dataDir, newDataDir);
+            } catch(e) {
+              new Notice(e.message);
+              this.plugin.settings.isSyncing = false;
+              await this.plugin.saveSettings();
+              return;
+            }
+
+            // Re-enable sync and persist setting
+            this.plugin.settings.dataDir = newDataDir;
+            this.plugin.settings.isSyncing = false;
+            await this.plugin.saveSettings();
+          }));
 
     new Setting(containerEl)
       .setName('Sync Frequency')
