@@ -188,8 +188,6 @@ export class MatterSettingsTab extends PluginSettingTab {
             refresh_token: loginSession.refresh_token,
           };
         }
-      } catch (e) {
-        // TODO: handle
       } finally {
         attempts++;
         await sleep(1000);

@@ -1,4 +1,3 @@
-// TODO: replace `any` types with type definitions
 import {
   Notice,
   Plugin,
