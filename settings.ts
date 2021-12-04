@@ -86,7 +86,6 @@ export class MatterSettingsTab extends PluginSettingTab {
     canvas.className = 'matter-qr';
     qrSetting.settingEl.appendChild(canvas);
 
-    /* tslint:disable-next-line */
     new QRious({
       element: canvas,
       value: this.plugin.settings.qrSessionToken,

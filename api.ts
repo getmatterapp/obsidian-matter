@@ -10,8 +10,6 @@ export const ENDPOINTS = {
   HIGHLIGHTS_FEED: `${MATTER_API_HOST}/library_items/highlights_feed/`
 }
 
-/* tslint:disable-next-line */
-export interface Profile {}
 export interface Annotation {
   created_date: string;
   note: string | null;
@@ -32,18 +30,16 @@ export interface Content {
   url: string;
 }
 
-/* tslint:disable-next-line */
-export interface Recommendation {}
 export interface FeedEntry {
   annotations: Annotation[];
   content: Content;
   feed_context: null;
   id: string;
-  recommendations: Recommendation[];
+  recommendations: any[];
 }
 
 export interface FeedResponse {
-  current_profile: {};
+  current_profile: any;
   feed: FeedEntry[];
   id: string;
   next: string | null;
