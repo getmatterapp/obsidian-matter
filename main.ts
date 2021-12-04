@@ -43,21 +43,18 @@ export default class MatterPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     this.addSettingTab(new MatterSettingsTab(this.app, this));
-    await this.loopSync();
+
+    // Reset isSyncing when the plugin is loaded.
+    this.settings.isSyncing = false;
+    await this.saveSettings();
+    await this.sync();
+
     setInterval(async () => {
       await this.loopSync();
     }, LOOP_SYNC_INTERVAL);
   }
 
   onunload() {
-  }
-
-  async loopSync() {
-    const msSinceLastSync = new Date() - new Date(this.settings.lastSync);
-    const mssyncInterval = this.settings.syncInterval * 60 * 1000;
-    if (this.settings.accessToken && this.settings.hasCompletedInitialSetup && msSinceLastSync >= mssyncInterval) {
-      this.sync();
-    }
   }
 
   async loadSettings() {
@@ -68,30 +65,50 @@ export default class MatterPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
+  async loopSync() {
+    const msSinceLastSync = new Date().valueOf() - new Date(this.settings.lastSync).valueOf();
+    const mssyncInterval = this.settings.syncInterval * 60 * 1000;
+    if (
+      this.settings.accessToken
+      && this.settings.hasCompletedInitialSetup
+      && msSinceLastSync >= mssyncInterval
+    ) {
+      this.sync();
+    }
+  }
+
   async sync() {
-    if (this.settings.isSyncing) {
+    if (this.settings.isSyncing || !this.settings.accessToken) {
       return;
     }
 
     this.settings.isSyncing = true;
     await this.saveSettings();
 
-    // TODO: optimize by only updating entries since last sync.
-    if (this.settings.accessToken) {
+    try {
       new Notice('Syncing with Matter');
-      let url = ENDPOINTS.HIGHLIGHTS_FEED
-      while (url !== null) {
-        const response = await this._authedRequest(url);
-        await this._handleFeed(response.feed);
-        url = response.next;
-      }
+      await this._pageAnnotations();
       this.settings.lastSync = new Date();
-      await this.saveSettings()
       new Notice('Finished syncing with Matter');
+    } catch (error) {
+      console.error(error);
+      new Notice('There was a problem syncing with Matter, try again later.');
     }
 
     this.settings.isSyncing = false;
     await this.saveSettings();
+  }
+
+  private async _pageAnnotations() {
+    let url = ENDPOINTS.HIGHLIGHTS_FEED;
+    while (url !== null) {
+      const response = await this._authedRequest(url);
+      for (let i = 0; i < response.feed.length; i++) {
+        const feedEntry = response.feed[i];
+        await this._handleFeedEntry(feedEntry);
+      }
+      url = response.next;
+    }
   }
 
   private async _authedRequest(url: string) {
@@ -118,10 +135,6 @@ export default class MatterPlugin extends Plugin {
     await this.saveSettings();
   }
 
-  private async _handleFeed(feed: any[])  {
-    feed.forEach(async (feedEntry) => (await this._handleFeedEntry(feedEntry)));
-  }
-
   private async _handleFeedEntry(feedEntry: any) {
     const fs = this.app.vault.adapter;
     if (!(await fs.exists(this.settings.dataDir))) {
@@ -129,17 +142,42 @@ export default class MatterPlugin extends Plugin {
     }
 
     const entryPath = `${this.settings.dataDir}/${toFilename(feedEntry.content.title)}.md`;
-    await fs.write(entryPath, this._renderFeedEntry(feedEntry));
+    if (await fs.exists(entryPath)) {
+      const after = new Date(this.settings.lastSync);
+      let content = await fs.read(entryPath);
+      content = this._appendAnnotations(feedEntry, content, after);
+      await fs.write(entryPath, content);
+    } else {
+      await fs.write(entryPath, this._renderFeedEntry(feedEntry));
+    }
+  }
+
+  private _appendAnnotations(feedEntry: any, content: string, after: Date): string {
+    const newAnnotations = feedEntry.content.my_annotations.filter((a: any) => new Date(a.created_date) > after);
+    if (!newAnnotations.length) {
+      return;
+    }
+
+    if (content[-1] !== '\n') {
+      content += '\n';
+    }
+
+    return content + `${newAnnotations.map(this._renderAnnotation).join('\n')}`;
   }
 
   private _renderFeedEntry(feedEntry: any): string {
-    const publicationDate = new Date(feedEntry.content.publication_date);
+    let publicationDateStr = "";
+    if (feedEntry.content.publication_date) {
+      const publicationDate = new Date(feedEntry.content.publication_date);
+      publicationDateStr = publicationDate.toISOString().slice(0, 10);
+    }
+
     const annotations = feedEntry.content.my_annotations.sort((a: any, b: any) => a.word_start - b.word_start);
     // TODO: find a better of handling templates
     return `
 ## Metadata
 * URL: [${feedEntry.content.url}](${feedEntry.content.url})
-* Published Date: [[${publicationDate.toISOString().slice(0, 10)}]]
+${publicationDateStr ? `* Published Date: ${publicationDateStr}` : ''}
 ${feedEntry.content.author ? `* Author: [[${feedEntry.content.author.any_name}]]\n` : ''}
 ## Highlights
 ${annotations.map(this._renderAnnotation).join("\n")}
@@ -259,7 +297,9 @@ class MatterSettingsTab extends PluginSettingTab {
       .setDesc('Manually start a sync with Matter')
       .addButton(button => button
         .setButtonText('Sync')
-        .onClick(async () => await this.plugin.sync()));
+        .onClick(async () => {
+          await this.plugin.sync()
+        }));
 
     new Setting(containerEl)
       .setName('Matter Sync Folder')
