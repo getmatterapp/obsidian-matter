@@ -1,41 +1,23 @@
 // TODO: replace `any` types with type definitions
-import { App, ButtonComponent, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
-import QRious from 'qrious';
-
-const CLIENT_TYPE = 'web';  // TODO: create an integration client type with read access
-const MATTER_API_VERSION = 'v11';
-const MATTER_API_DOMAIN = 'api.getmatter.app'
-const MATTER_API_HOST = `https://${MATTER_API_DOMAIN}/api/${MATTER_API_VERSION}`;
-const ENDPOINTS = {
-  QR_LOGIN_TRIGGER: `${MATTER_API_HOST}/qr_login/trigger/`,
-  QR_LOGIN_EXCHANGE: `${MATTER_API_HOST}/qr_login/exchange/`,
-  REFRESH_TOKEN_EXCHANGE: `${MATTER_API_HOST}/token/refresh/`,
-  HIGHLIGHTS_FEED: `${MATTER_API_HOST}/library_items/highlights_feed/`
-}
+import {
+  Notice,
+  Plugin,
+} from 'obsidian';
+import {
+  Annotation,
+  ENDPOINTS,
+  FeedEntry,
+  FeedResponse,
+  authedRequest,
+} from './api';
+import {
+  DEFAULT_SETTINGS,
+  MatterSettings,
+  MatterSettingsTab
+} from './settings';
+import { toFilename } from './utils';
 
 const LOOP_SYNC_INTERVAL = 1000;  // TODO: increase to 1 minute
-
-interface MatterSettings {
-  accessToken: string | null;
-  refreshToken: string | null;
-  qrSessionToken: string | null;
-  dataDir: string | null;
-  syncInterval: number;
-  hasCompletedInitialSetup: boolean;
-  lastSync: Date | null;
-  isSyncing: boolean;
-}
-
-const DEFAULT_SETTINGS: MatterSettings = {
-  accessToken: null,
-  refreshToken: null,
-  qrSessionToken: null,
-  dataDir: "Matter",
-  syncInterval: 60,
-  hasCompletedInitialSetup: false,
-  lastSync: null,
-  isSyncing: false,
-}
 
 export default class MatterPlugin extends Plugin {
   settings: MatterSettings;
@@ -63,6 +45,7 @@ export default class MatterPlugin extends Plugin {
   }
 
   onunload() {
+    return;
   }
 
   async loadSettings() {
@@ -94,12 +77,16 @@ export default class MatterPlugin extends Plugin {
     await this.saveSettings();
 
     try {
+      /* tslint:disable-next-line */
       new Notice('Syncing with Matter');
+
       await this._pageAnnotations();
       this.settings.lastSync = new Date();
+
+      /* tslint:disable-next-line */
       new Notice('Finished syncing with Matter');
     } catch (error) {
-      console.error(error);
+      /* tslint:disable-next-line */
       new Notice('There was a problem syncing with Matter, try again later.');
     }
 
@@ -110,9 +97,8 @@ export default class MatterPlugin extends Plugin {
   private async _pageAnnotations() {
     let url = ENDPOINTS.HIGHLIGHTS_FEED;
     while (url !== null) {
-      const response = await this._authedRequest(url);
-      for (let i = 0; i < response.feed.length; i++) {
-        const feedEntry = response.feed[i];
+      const response: FeedResponse = await this._authedRequest(url);
+      for (const feedEntry of response.feed) {
         await this._handleFeedEntry(feedEntry);
       }
       url = response.next;
@@ -122,7 +108,7 @@ export default class MatterPlugin extends Plugin {
   private async _authedRequest(url: string) {
     try {
       return (await authedRequest(this.settings.accessToken, url));
-    } catch(e) {
+    } catch (e) {
       // TODO: verify status code before retrying
       await this._refreshTokenExchange();
       return (await authedRequest(this.settings.accessToken, url));
@@ -143,7 +129,7 @@ export default class MatterPlugin extends Plugin {
     await this.saveSettings();
   }
 
-  private async _handleFeedEntry(feedEntry: any) {
+  private async _handleFeedEntry(feedEntry: FeedEntry) {
     const fs = this.app.vault.adapter;
     if (!(await fs.exists(this.settings.dataDir))) {
       fs.mkdir(this.settings.dataDir);
@@ -160,8 +146,8 @@ export default class MatterPlugin extends Plugin {
     }
   }
 
-  private _appendAnnotations(feedEntry: any, content: string, after: Date): string {
-    const newAnnotations = feedEntry.content.my_annotations.filter((a: any) => new Date(a.created_date) > after);
+  private _appendAnnotations(feedEntry: FeedEntry, content: string, after: Date): string {
+    const newAnnotations = feedEntry.content.my_annotations.filter(a => new Date(a.created_date) > after);
     if (!newAnnotations.length) {
       return content;
     }
@@ -173,14 +159,14 @@ export default class MatterPlugin extends Plugin {
     return content + `${newAnnotations.map(this._renderAnnotation).join('\n')}`;
   }
 
-  private _renderFeedEntry(feedEntry: any): string {
+  private _renderFeedEntry(feedEntry: FeedEntry): string {
     let publicationDateStr = "";
     if (feedEntry.content.publication_date) {
       const publicationDate = new Date(feedEntry.content.publication_date);
       publicationDateStr = publicationDate.toISOString().slice(0, 10);
     }
 
-    const annotations = feedEntry.content.my_annotations.sort((a: any, b: any) => a.word_start - b.word_start);
+    const annotations = feedEntry.content.my_annotations.sort((a, b) => a.word_start - b.word_start);
     // TODO: find a better of handling templates
     return `
 ## Metadata
@@ -192,208 +178,10 @@ ${annotations.map(this._renderAnnotation).join("\n")}
 `.trim();
   }
 
-  private _renderAnnotation(annotation: any) {
+  private _renderAnnotation(annotation: Annotation) {
     return `
 * ${annotation.text}${annotation.note ? `
-  * **Note**: ${annotation.note}`: ''}
+  * **Note**: ${annotation.note}` : ''}
 `.trim()
   }
-}
-
-class MatterSettingsTab extends PluginSettingTab {
-  // TODO: allow the user to stop syncing & sign out
-  plugin: MatterPlugin;
-
-  constructor(app: App, plugin: MatterPlugin) {
-    super(app, plugin);
-    this.plugin = plugin;
-  }
-
-  display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-    this.loadInterface();
-  }
-
-  loadInterface(): void {
-    const { containerEl } = this;
-    containerEl.createEl('h1', { text: 'Matter' });
-
-    if (!this.plugin.settings.accessToken || !this.plugin.settings.hasCompletedInitialSetup) {
-      this.displaySetup();
-    } else {
-      this.displaySettings();
-    }
-  }
-
-  async displaySetup(): Promise<void> {
-    const { containerEl } = this;
-
-    try {
-      const headers = new Headers();
-      headers.set('Content-Type', 'application/json');
-
-      const triggerResponse = await fetch(ENDPOINTS.QR_LOGIN_TRIGGER, {
-        method: "POST",
-        body: JSON.stringify({ client_type: CLIENT_TYPE }),
-        headers,
-      });
-      this.plugin.settings.qrSessionToken = (await triggerResponse.json()).session_token;
-    } catch (error) {
-      return;
-    }
-
-    const qrSetting = new Setting(containerEl)
-      .setName('Scan this QR code in the Matter app')
-      .setDesc('Go to Profile > Settings > Connected Accounts > Obsidian');
-
-    const canvas = document.createElement('canvas');
-    canvas.className = 'matter-qr';
-    qrSetting.settingEl.appendChild(canvas);
-
-    new QRious({
-      element: canvas,
-      value: this.plugin.settings.qrSessionToken,
-      size: 80,
-      backgroundAlpha: 0.2,
-    });
-
-    new Setting(containerEl)
-      .setName('Matter Sync Folder')
-      .setDesc('Where do you want your Matter data to live in Obsidian?')
-      .addText(text => text
-        .setPlaceholder('Enter location')
-        .setValue(this.plugin.settings.dataDir)
-        .onChange(async (value) => {
-          // TODO: move all data to the new directory
-          this.plugin.settings.dataDir = value;
-          await this.plugin.saveSettings();
-        }));
-
-    const startBtn = new ButtonComponent(containerEl)
-      .setButtonText('Start Syncing')
-      .setClass('matter-setup-btn')
-      .setDisabled(true)
-      .onClick(async () => {
-        this.plugin.settings.hasCompletedInitialSetup = true;
-        await this.plugin.saveSettings();
-        this.plugin.sync();
-        this.plugin.loopSync();
-        this.display();
-      });
-
-    const { access_token, refresh_token } = await this._pollQRLoginExchange();
-    if (access_token) {
-      this.plugin.settings.accessToken = access_token;
-      this.plugin.settings.refreshToken = refresh_token;
-      await this.plugin.saveSettings();
-
-      canvas.remove();
-      const authConfirmation = document.createElement('p');
-      authConfirmation.className = 'matter-auth-confirmation';
-      authConfirmation.appendText('✅');
-      qrSetting.settingEl.appendChild(authConfirmation);
-      startBtn.setDisabled(false);
-    }
-  }
-
-  async displaySettings() {
-    const { containerEl } = this;
-
-    new Setting(containerEl)
-      .setName('Sync with Matter')
-      .setDesc('Manually start a sync with Matter')
-      .addButton(button => button
-        .setButtonText('Sync')
-        .onClick(async () => {
-          await this.plugin.sync()
-        }));
-
-    new Setting(containerEl)
-      .setName('Matter Sync Folder')
-      .setDesc('Where do you want your Matter data to live in Obsidian?')
-      .addText(text => text
-        .setPlaceholder('Enter location')
-        .setValue(this.plugin.settings.dataDir)
-        .onChange(async (value) => {
-          this.plugin.settings.dataDir = value;
-          await this.plugin.saveSettings();
-        }));
-
-    new Setting(containerEl)
-      .setName('Sync Frequency')
-      .setDesc('How often should Obsidian sync with Matter?')
-      .addDropdown(dropdown => dropdown
-        .addOption("1", "Every minute")  // TODO: remove before public release
-        .addOption("60", "Every hour")
-        .addOption("720", "Every 12 hours")
-        .addOption("1440", "Every 24 hours")
-        .setValue(this.plugin.settings.syncInterval.toString())
-        .onChange(async (val) => {
-          this.plugin.settings.syncInterval = parseInt(val)
-          await this.plugin.saveSettings()
-        })
-      );
-  }
-
-  private async _pollQRLoginExchange() {
-    if (!this.plugin.settings.qrSessionToken) {
-      return;
-    }
-
-    let attempts = 0;
-    while (attempts < 600) {
-      try {
-        const response = await this._qrLoginExchange(this.plugin.settings.qrSessionToken);
-        const loginSession = await response.json();
-        if (loginSession?.access_token) {
-          return {
-            access_token: loginSession.access_token,
-            refresh_token: loginSession.refresh_token,
-          };
-        }
-      } catch(e) {
-        // TODO: handle
-      } finally {
-        attempts++;
-        await sleep(1000);
-      }
-    }
-  }
-
-  private async _qrLoginExchange(session_token: string): Promise<any> {
-    const headers = new Headers();
-    headers.set('Content-Type', 'application/json');
-    return await fetch(ENDPOINTS.QR_LOGIN_EXCHANGE, {
-      method: "POST",
-      body: JSON.stringify({
-        session_token
-      }),
-      headers,
-    });
-  }
-}
-
-const authedRequest = async(
-  accessToken: string,
-  url: string,
-  fetchArgs: RequestInit = {},
-) => {
-  const headers = new Headers();
-  headers.set('Authorization', `Bearer ${accessToken}`);
-  headers.set('Content-Type', 'application/json');
-
-  const response = await fetch(url, {
-    ...fetchArgs,
-    headers,
-  });
-  return response.json()
-}
-
-const sleep = (ms: number): Promise<void> => {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-const toFilename = (s: string): string => {
-  return s.replace(/[/\\?%*:|"<>]/g, '-');
 }
