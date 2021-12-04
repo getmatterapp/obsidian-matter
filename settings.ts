@@ -37,7 +37,6 @@ export const DEFAULT_SETTINGS: MatterSettings = {
 }
 
 export class MatterSettingsTab extends PluginSettingTab {
-  // TODO: allow the user to stop syncing & sign out
   plugin: MatterPlugin;
 
   constructor(app: App, plugin: MatterPlugin) {
