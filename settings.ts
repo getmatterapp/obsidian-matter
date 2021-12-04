@@ -101,7 +101,7 @@ export class MatterSettingsTab extends PluginSettingTab {
         .setPlaceholder('Enter location')
         .setValue(this.plugin.settings.dataDir)
         .onChange(async (value) => {
-          // TODO: move all data to the new directory
+          value = value.replace(/^\/+|\/+$/g, '');
           this.plugin.settings.dataDir = value;
           await this.plugin.saveSettings();
         }));
@@ -152,7 +152,8 @@ export class MatterSettingsTab extends PluginSettingTab {
         .setPlaceholder('Enter location')
         .setValue(this.plugin.settings.dataDir)
         .onChange(async (value) => {
-          this.plugin.settings.dataDir = value;
+          // TODO: move all data to the new directory
+          value = value.replace(/^\/+|\/+$/g, '');
           await this.plugin.saveSettings();
         }));
 
