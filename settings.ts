@@ -14,6 +14,10 @@ import {
 import MatterPlugin from './main';
 import { sleep } from './utils';
 
+export interface ContentMap {
+  [key: string]: string;
+}
+
 export interface MatterSettings {
   accessToken: string | null;
   refreshToken: string | null;
@@ -23,6 +27,7 @@ export interface MatterSettings {
   hasCompletedInitialSetup: boolean;
   lastSync: Date | null;
   isSyncing: boolean;
+  contentMap: ContentMap
 }
 
 export const DEFAULT_SETTINGS: MatterSettings = {
@@ -34,6 +39,7 @@ export const DEFAULT_SETTINGS: MatterSettings = {
   hasCompletedInitialSetup: false,
   lastSync: null,
   isSyncing: false,
+  contentMap: {},
 }
 
 export class MatterSettingsTab extends PluginSettingTab {

@@ -129,10 +129,9 @@ export default class MatterPlugin extends Plugin {
   private async _handleFeedEntry(feedEntry: FeedEntry) {
     const fs = this.app.vault.adapter;
     if (!(await fs.exists(this.settings.dataDir))) {
-      fs.mkdir(this.settings.dataDir);
+      await fs.mkdir(this.settings.dataDir);
     }
-
-    const entryPath = `${this.settings.dataDir}/${toFilename(feedEntry.content.title)}.md`;
+    const entryPath = await this._generateEntryPath(feedEntry);
     if (await fs.exists(entryPath)) {
       const after = new Date(this.settings.lastSync);
       let content = await fs.read(entryPath);
@@ -141,6 +140,21 @@ export default class MatterPlugin extends Plugin {
     } else {
       await fs.write(entryPath, this._renderFeedEntry(feedEntry));
     }
+  }
+
+  private async _generateEntryPath(feedEntry: FeedEntry): Promise<string> {
+    const fs = this.app.vault.adapter;
+    let path = `${this.settings.dataDir}/${toFilename(feedEntry.content.title)}.md`;
+
+    let i = 1;
+    while ((await fs.exists(path)) && this.settings.contentMap[path] !== feedEntry.id) {
+      i++;
+      path = `${this.settings.dataDir}/${toFilename(feedEntry.content.title)}-${i}.md`;
+    }
+
+    this.settings.contentMap[path] = feedEntry.id;
+    await this.saveSettings();
+    return path;
   }
 
   private _appendAnnotations(feedEntry: FeedEntry, content: string, after: Date): string {
