@@ -173,21 +173,29 @@ export default class MatterPlugin extends Plugin {
   }
 
   private _renderFeedEntry(feedEntry: FeedEntry): string {
-    let publicationDateStr = "";
-    if (feedEntry.content.publication_date) {
-      const publicationDate = new Date(feedEntry.content.publication_date);
-      publicationDateStr = publicationDate.toISOString().slice(0, 10);
-    }
-
     const annotations = feedEntry.content.my_annotations.sort((a, b) => a.word_start - b.word_start);
     return `
 ## Metadata
-* URL: [${feedEntry.content.url}](${feedEntry.content.url})
-${publicationDateStr ? `* Published Date: ${publicationDateStr}` : ''}
-${feedEntry.content.author ? `* Author: [[${feedEntry.content.author.any_name}]]\n` : ''}
+${this._renderMetadata(feedEntry)}
 ## Highlights
 ${annotations.map(this._renderAnnotation).join("\n")}
 `.trim();
+  }
+
+  private _renderMetadata(feedEntry: FeedEntry): string {
+    let metadata = `* URL: [${feedEntry.content.url}](${feedEntry.content.url})`;
+    if (feedEntry.content.publication_date) {
+      const publicationDate = new Date(feedEntry.content.publication_date);
+      const publicationDateStr = publicationDate.toISOString().slice(0, 10);
+      metadata += `\n* Published Date: ${publicationDateStr}`;
+    }
+
+    if (feedEntry.content.author) {
+      metadata += `\n* Author: [[${feedEntry.content.author.any_name}]]`;
+    }
+
+    metadata += '\n';
+    return metadata;
   }
 
   private _renderAnnotation(annotation: Annotation) {
