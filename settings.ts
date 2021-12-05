@@ -163,6 +163,7 @@ export class MatterSettingsTab extends PluginSettingTab {
         }))
         .addButton(button => button
           .setButtonText('Apply')
+          .setClass('matter-folder-button')
           .onClick(async () => {
             if (newDataDir === this.plugin.settings.dataDir) {
               return;
@@ -187,6 +188,13 @@ export class MatterSettingsTab extends PluginSettingTab {
               await this.plugin.saveSettings();
               return;
             }
+
+            // Update the content map with the new prefix
+            Object.keys(this.plugin.settings.contentMap).forEach(key => {
+              const newKey = newDataDir + key.substr(this.plugin.settings.dataDir.length);
+              this.plugin.settings.contentMap[newKey] = this.plugin.settings.contentMap[key];
+              delete this.plugin.settings.contentMap[key];
+            });
 
             // Re-enable sync and persist setting
             this.plugin.settings.dataDir = newDataDir;
