@@ -16,7 +16,7 @@ import {
 } from './settings';
 import { toFilename } from './utils';
 
-const LOOP_SYNC_INTERVAL = 1000;  // TODO: increase to 1 minute
+const LOOP_SYNC_INTERVAL = 60 * 1000;
 
 export default class MatterPlugin extends Plugin {
   intervalRef: NodeJS.Timer;
@@ -36,6 +36,8 @@ export default class MatterPlugin extends Plugin {
       && this.settings.hasCompletedInitialSetup
     ) {
       await this.sync();
+    } else {
+      new Notice("Finish setting up Matter in settings");
     }
 
     // Set up sync interval
@@ -106,7 +108,6 @@ export default class MatterPlugin extends Plugin {
     try {
       return (await authedRequest(this.settings.accessToken, url));
     } catch (e) {
-      // TODO: verify status code before retrying
       await this._refreshTokenExchange();
       return (await authedRequest(this.settings.accessToken, url));
     }
@@ -124,6 +125,11 @@ export default class MatterPlugin extends Plugin {
     this.settings.accessToken = payload.access_token;
     this.settings.refreshToken = payload.refresh_token;
     await this.saveSettings();
+
+    if (!this.settings.accessToken) {
+      new Notice("Unable to sync with Matter, please sign in again.");
+      throw new Error("Authentication failed");
+    }
   }
 
   private async _handleFeedEntry(feedEntry: FeedEntry) {

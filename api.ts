@@ -51,11 +51,20 @@ export interface QRLoginExchangeResponse {
   refresh_token?: string | null;
 }
 
-export const authedRequest = async(
+class RequestError extends Error {
+  response: Response;
+
+  public constructor(response: Response, message?: string,) {
+    super(message);
+    this.response = response;
+  }
+}
+
+export async function authedRequest(
   accessToken: string,
   url: string,
   fetchArgs: RequestInit = {},
-) => {
+) {
   const headers = new Headers();
   headers.set('Authorization', `Bearer ${accessToken}`);
   headers.set('Content-Type', 'application/json');
@@ -64,5 +73,10 @@ export const authedRequest = async(
     ...fetchArgs,
     headers,
   });
-  return response.json()
+
+  if (!response.ok) {
+    throw new RequestError(response, "Matter authenticated request failed");
+  }
+
+  return (await response.json());
 }

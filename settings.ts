@@ -198,7 +198,7 @@ export class MatterSettingsTab extends PluginSettingTab {
       .setName('Sync Frequency')
       .setDesc('How often should Obsidian sync with Matter?')
       .addDropdown(dropdown => dropdown
-        .addOption("1", "Every minute")  // TODO: remove before public release
+        .addOption("30", "Every half hour")
         .addOption("60", "Every hour")
         .addOption("720", "Every 12 hours")
         .addOption("1440", "Every 24 hours")
