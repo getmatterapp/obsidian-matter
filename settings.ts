@@ -112,8 +112,10 @@ export class MatterSettingsTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }));
 
+    console.log(this.plugin.app.workspace.getLayout())
     const startBtn = new ButtonComponent(containerEl)
       .setButtonText('Start Syncing')
+      .setClass('mod-cta')
       .setClass('matter-setup-btn')
       .setDisabled(true)
       .onClick(async () => {
