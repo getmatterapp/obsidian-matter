@@ -1,5 +1,4 @@
-
-export const CLIENT_TYPE = 'web';
+export const CLIENT_TYPE = 'integration';
 export const MATTER_API_VERSION = 'v11';
 export const MATTER_API_DOMAIN = 'api.getmatter.app';
 export const MATTER_API_HOST = `https://${MATTER_API_DOMAIN}/api/${MATTER_API_VERSION}`;
