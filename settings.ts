@@ -142,15 +142,6 @@ export class MatterSettingsTab extends PluginSettingTab {
   async displaySettings() {
     const { containerEl } = this;
 
-    new Setting(containerEl)
-      .setName('Sync with Matter')
-      .setDesc('Manually start a sync with Matter')
-      .addButton(button => button
-        .setButtonText('Sync')
-        .onClick(async () => {
-          await this.plugin.sync()
-        }));
-
     let newDataDir = this.plugin.settings.dataDir;
     new Setting(containerEl)
       .setName('Matter Sync Folder')
@@ -211,6 +202,15 @@ export class MatterSettingsTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
+
+    new Setting(containerEl)
+      .setName('Sync Now')
+      .setDesc('Manually start a sync with Matter')
+      .addButton(button => button
+        .setButtonText('Sync Now')
+        .onClick(async () => {
+          await this.plugin.sync()
+        }));
   }
 
   private async _pollQRLoginExchange() {
