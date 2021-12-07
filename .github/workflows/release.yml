@@ -6,7 +6,7 @@ on:
       - "*"
 
 env:
-  PLUGIN_NAME: obsidian-matter
+  PLUGIN_NAME: matter
 
 jobs:
   build:

@@ -1,5 +1,5 @@
 {
-	"name": "obsidian-matter",
+	"name": "matter",
 	"version": "0.3.0",
 	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
 	"main": "main.js",
