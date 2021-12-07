@@ -91,12 +91,19 @@ export default class MatterPlugin extends Plugin {
 
   private async _pageAnnotations() {
     let url = ENDPOINTS.HIGHLIGHTS_FEED;
+    let feedEntries: FeedEntry[] = [];
+
+    // Load all feed items new to old.
     while (url !== null) {
       const response: FeedResponse = await this._authedRequest(url);
-      for (const feedEntry of response.feed) {
-        await this._handleFeedEntry(feedEntry);
-      }
+      feedEntries = feedEntries.concat(response.feed);
       url = response.next;
+    }
+
+    // Reverse the feed items so that chronological ordering is preserved.
+    feedEntries = feedEntries.reverse();
+    for (const feedEntry of feedEntries) {
+      await this._handleFeedEntry(feedEntry);
     }
   }
 
@@ -133,6 +140,7 @@ export default class MatterPlugin extends Plugin {
     if (!(await fs.exists(this.settings.dataDir))) {
       await fs.mkdir(this.settings.dataDir);
     }
+
     const entryPath = await this._generateEntryPath(feedEntry);
     if (await fs.exists(entryPath)) {
       const after = new Date(this.settings.lastSync);
