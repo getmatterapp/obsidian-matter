@@ -108,7 +108,7 @@ export class MatterSettingsTab extends PluginSettingTab {
         .setValue(this.plugin.settings.dataDir)
         .onChange(async (value) => {
           value = value.replace(/^\/+|\/+$/g, '');
-          this.plugin.settings.dataDir = value;
+          this.plugin.settings.dataDir = normalizePath(value);
           await this.plugin.saveSettings();
         }));
 
