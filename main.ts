@@ -1,4 +1,5 @@
 import {
+  normalizePath,
   Notice,
   Plugin,
 } from 'obsidian';
@@ -141,30 +142,39 @@ export default class MatterPlugin extends Plugin {
       await fs.mkdir(this.settings.dataDir);
     }
 
-    const entryPath = await this._generateEntryPath(feedEntry);
+    const entryName = await this._generateEntryName(feedEntry);
+    const entryPath = this._getPath(entryName);
     if (await fs.exists(entryPath)) {
       const after = new Date(this.settings.lastSync);
-      let content = await fs.read(entryPath);
-      content = this._appendAnnotations(feedEntry, content, after);
-      await fs.write(entryPath, content);
+      const content = await fs.read(entryPath);
+      const newContent = this._appendAnnotations(feedEntry, content, after);
+      if (newContent != content) {
+        await fs.write(entryPath, newContent);
+      }
     } else {
       await fs.write(entryPath, this._renderFeedEntry(feedEntry));
     }
   }
 
-  private async _generateEntryPath(feedEntry: FeedEntry): Promise<string> {
-    const fs = this.app.vault.adapter;
-    let path = `${this.settings.dataDir}/${toFilename(feedEntry.content.title)}.md`;
+  private _getPath(name: string){
+    return normalizePath(`${this.settings.dataDir}/${name}`);
+  }
 
+  private async _generateEntryName(feedEntry: FeedEntry): Promise<string> {
+    const fs = this.app.vault.adapter;
+    let name = `${toFilename(feedEntry.content.title)}.md`
     let i = 1;
-    while ((await fs.exists(path)) && this.settings.contentMap[path] !== feedEntry.id) {
+    while (
+      (await fs.exists(this._getPath(name)))
+      && this.settings.contentMap[name] !== feedEntry.id
+    ) {
       i++;
-      path = `${this.settings.dataDir}/${toFilename(feedEntry.content.title)}-${i}.md`;
+      name = `${toFilename(feedEntry.content.title)}-${i}.md`;
     }
 
-    this.settings.contentMap[path] = feedEntry.id;
+    this.settings.contentMap[name] = feedEntry.id;
     await this.saveSettings();
-    return path;
+    return name;
   }
 
   private _appendAnnotations(feedEntry: FeedEntry, content: string, after: Date): string {

@@ -1,6 +1,7 @@
 import {
   App,
   ButtonComponent,
+  normalizePath,
   Notice,
   PluginSettingTab,
   Setting,
@@ -189,17 +190,11 @@ export class MatterSettingsTab extends PluginSettingTab {
               return;
             }
 
-            // Update the content map with the new prefix
-            Object.keys(this.plugin.settings.contentMap).forEach(key => {
-              const newKey = newDataDir + key.substr(this.plugin.settings.dataDir.length);
-              this.plugin.settings.contentMap[newKey] = this.plugin.settings.contentMap[key];
-              delete this.plugin.settings.contentMap[key];
-            });
-
             // Re-enable sync and persist setting
-            this.plugin.settings.dataDir = newDataDir;
+            this.plugin.settings.dataDir = normalizePath(newDataDir);
             this.plugin.settings.isSyncing = false;
             await this.plugin.saveSettings();
+            new Notice("Sync folder updated")
           }));
 
     new Setting(containerEl)
