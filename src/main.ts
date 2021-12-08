@@ -15,7 +15,7 @@ import {
   MatterSettings,
   MatterSettingsTab
 } from './settings';
-import { toFilename } from './utils';
+import { monkeyPatchConsole, toFilename } from './utils';
 
 const LOOP_SYNC_INTERVAL = 60 * 1000;
 
@@ -23,6 +23,7 @@ export default class MatterPlugin extends Plugin {
   settings: MatterSettings;
 
   async onload() {
+    monkeyPatchConsole(this);
     await this.loadSettings();
     this.addSettingTab(new MatterSettingsTab(this.app, this));
 
@@ -83,6 +84,7 @@ export default class MatterPlugin extends Plugin {
       this.settings.lastSync = new Date();
       new Notice('Finished syncing with Matter');
     } catch (error) {
+      console.error(error);
       new Notice('There was a problem syncing with Matter, try again later.');
     }
 
