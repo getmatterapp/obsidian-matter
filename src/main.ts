@@ -26,6 +26,19 @@ export default class MatterPlugin extends Plugin {
     await this.loadSettings();
     this.addSettingTab(new MatterSettingsTab(this.app, this));
 
+    // Call in parallel to avoid long loading times.
+    this.initialSync();
+
+    // Set up sync interval
+    this.registerInterval(window.setInterval(async () => {
+      await this.loopSync();
+    }, LOOP_SYNC_INTERVAL));
+  }
+
+  onunload() {
+  }
+
+  async initialSync() {
     // Reset isSyncing when the plugin is loaded.
     this.settings.isSyncing = false;
     await this.saveSettings();
@@ -39,14 +52,6 @@ export default class MatterPlugin extends Plugin {
     } else {
       new Notice("Finish setting up Matter in settings");
     }
-
-    // Set up sync interval
-    this.registerInterval(window.setInterval(async () => {
-      await this.loopSync();
-    }, LOOP_SYNC_INTERVAL));
-  }
-
-  onunload() {
   }
 
   async loadSettings() {
