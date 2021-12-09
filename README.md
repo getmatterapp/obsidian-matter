@@ -5,9 +5,9 @@ Sync all of your [Matter](https://hq.getmatter.app) highlights and notes directl
 ## Usage
 1. Install the Matter plugin via the Obsidian community plugins page
 2. Enable the plugin
-3. In the "Matter" settings page, connect the plugin to your Matter account
+3. In the "Matter" settings page under Plugin Options, connect the plugin to your Matter account by scanning the QR code.
 4. Configure the integration
-5. Sync!
+5. Start Syncing!
 
 After the initial setup, Matter will automatically sync in the background.
 
