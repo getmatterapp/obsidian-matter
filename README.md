@@ -5,22 +5,11 @@ Sync all of your [Matter](https://hq.getmatter.app) highlights and notes directl
 ## Usage
 1. Install the Matter plugin via the Obsidian community plugins page
 2. Enable the plugin
-3. In the "Matter" settings page under Plugin Options, connect the plugin to your Matter account by scanning the QR code.
-4. Configure the integration
+3. In the "Matter" settings page, connect the plugin to your Matter account
+    * Open the Matter application on your phone.
+    * Go to your Profile > Settings > Connected Accounts > Obsidian
+    * Press "Scan QR Code" and scan the QR code in the Matter settings page of Obsidian.
+4. Configure the plugin if desired
 5. Start Syncing!
 
 After the initial setup, Matter will automatically sync in the background.
-
-
-## Creating a new release
-
-1. Update the following files with the new release version:
-    - manifest.json
-    - package.json
-    - versions.json
-2. Commit and push those changes.
-3. Run:
-    ```
-    git tag -a <version> -m "<version>"
-    git push origin <version>
-    ```
