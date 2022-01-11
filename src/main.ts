@@ -75,6 +75,10 @@ export default class MatterPlugin extends Plugin {
   }
 
   async sync() {
+    // The settings file can change via multiple device sync. Fetch a fresh copy
+    // just in case another sync is happening elsewhere.
+    await this.loadSettings();
+
     if (this.settings.isSyncing || !this.settings.accessToken) {
       return;
     }
