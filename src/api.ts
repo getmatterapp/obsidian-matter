@@ -22,11 +22,18 @@ export interface Author {
 }
 
 export interface Content {
+  tags: Tag[];
   author: Author;
   my_annotations: Annotation[];
   publication_date: string;
   title: string;
   url: string;
+}
+
+export interface Tag {
+  name: string;
+  id: number;
+  created_date: string;
 }
 
 export interface FeedEntry {

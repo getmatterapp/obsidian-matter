@@ -28,7 +28,8 @@ export interface MatterSettings {
   hasCompletedInitialSetup: boolean;
   lastSync: Date | null;
   isSyncing: boolean;
-  contentMap: ContentMap
+  contentMap: ContentMap;
+  metadataTemplate: string | null;
 }
 
 export const DEFAULT_SETTINGS: MatterSettings = {
@@ -41,6 +42,7 @@ export const DEFAULT_SETTINGS: MatterSettings = {
   lastSync: null,
   isSyncing: false,
   contentMap: {},
+  metadataTemplate: null
 }
 
 export class MatterSettingsTab extends PluginSettingTab {
@@ -213,6 +215,25 @@ export class MatterSettingsTab extends PluginSettingTab {
         .onClick(async () => {
           await this.plugin.sync()
         }));
+
+    let newMetadataTemplate = this.plugin.settings.metadataTemplate;
+    new Setting(containerEl)
+      .setName('Metadata Template')
+      .setDesc('What metadata should be included in your Matter files?')
+      .addText(text => text
+        .setPlaceholder([
+          'Edit Metadata Template',
+          'Supported Values:',
+          '- {{title}}',
+          '- {{author}}',
+          '- {{tags}}',
+          '- {{url}}',
+          '- {{publication_date}}'
+        ].join('\n'))
+        .setValue(newMetadataTemplate)
+        .onChange(async (value) => {
+          newMetadataTemplate = value;
+        }))
   }
 
   private async _pollQRLoginExchange() {

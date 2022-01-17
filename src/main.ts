@@ -211,19 +211,30 @@ ${annotations.map(this._renderAnnotation).join("\n")}
   }
 
   private _renderMetadata(feedEntry: FeedEntry): string {
-    let metadata = `* URL: [${feedEntry.content.url}](${feedEntry.content.url})`;
-    if (feedEntry.content.publication_date) {
-      const publicationDate = new Date(feedEntry.content.publication_date);
-      const publicationDateStr = publicationDate.toISOString().slice(0, 10);
-      metadata += `\n* Published Date: ${publicationDateStr}`;
-    }
 
-    if (feedEntry.content.author) {
-      metadata += `\n* Author: [[${feedEntry.content.author.any_name}]]`;
+    if (this.settings.metadataTemplate) {
+      const template = this.settings.metadataTemplate;
+      return template
+        .replace('{{url}}', feedEntry.content.url)
+        .replace('{{publication_date}}', (feedEntry.content.publication_date && new Date(feedEntry.content.publication_date).toISOString().slice(0, 10) || '')
+        .replace('{{author}}', feedEntry.content.author.any_name)
+        .replace('{{title}}', feedEntry.content.title)
+        .replace('{{tags}}', feedEntry.content.tags.map((t: { name: string }) => `#${t.name.split(' ').join('_')}`).join(' ')));
+    } else {
+      let metadata = `* URL: [${feedEntry.content.url}](${feedEntry.content.url})`;
+      if (feedEntry.content.publication_date) {
+        const publicationDate = new Date(feedEntry.content.publication_date);
+        const publicationDateStr = publicationDate.toISOString().slice(0, 10);
+        metadata += `\n* Published Date: ${publicationDateStr}`;
+      }
+  
+      if (feedEntry.content.author) {
+        metadata += `\n* Author: [[${feedEntry.content.author.any_name}]]`;
+      }
+  
+      metadata += '\n';
+      return metadata;
     }
-
-    metadata += '\n';
-    return metadata;
   }
 
   private _renderAnnotation(annotation: Annotation) {
