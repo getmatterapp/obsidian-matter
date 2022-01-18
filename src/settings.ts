@@ -114,6 +114,34 @@ export class MatterSettingsTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }));
 
+    let newMetadataTemplate = this.plugin.settings.metadataTemplate;
+    new Setting(containerEl)
+      .setName('Metadata Template')
+      .setDesc('What metadata should be included in your Matter files?')
+      .addTextArea(text => text
+        .setPlaceholder([
+          'Edit Metadata Template',
+          'Supported Values:',
+          '- {{title}}',
+          '- {{author}}',
+          '- {{tags}}',
+          '- {{url}}',
+          '- {{publication_date}}'
+        ].join('\n'))
+        .setValue(newMetadataTemplate)
+        .onChange(async (value) => {
+          newMetadataTemplate = value;
+        }))
+        .addButton(button => button
+          .setButtonText('Save')
+          .onClick(async () => {
+            if (newMetadataTemplate === this.plugin.settings.metadataTemplate) {
+              return;
+            }              
+            this.plugin.settings.metadataTemplate = newMetadataTemplate;
+            await this.plugin.saveSettings();
+          }))
+
     console.log(this.plugin.app.workspace.getLayout())
     const startBtn = new ButtonComponent(containerEl)
       .setButtonText('Start Syncing')
@@ -220,7 +248,7 @@ export class MatterSettingsTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Metadata Template')
       .setDesc('What metadata should be included in your Matter files?')
-      .addText(text => text
+      .addTextArea(text => text
         .setPlaceholder([
           'Edit Metadata Template',
           'Supported Values:',
@@ -234,6 +262,15 @@ export class MatterSettingsTab extends PluginSettingTab {
         .onChange(async (value) => {
           newMetadataTemplate = value;
         }))
+        .addButton(button => button
+          .setButtonText('Save')
+          .onClick(async () => {
+            if (newMetadataTemplate === this.plugin.settings.metadataTemplate) {
+              return;
+            }         
+            this.plugin.settings.metadataTemplate = newMetadataTemplate;
+            await this.plugin.saveSettings();
+          }))
   }
 
   private async _pollQRLoginExchange() {

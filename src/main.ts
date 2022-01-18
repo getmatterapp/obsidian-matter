@@ -203,23 +203,25 @@ export default class MatterPlugin extends Plugin {
   private _renderFeedEntry(feedEntry: FeedEntry): string {
     const annotations = feedEntry.content.my_annotations.sort((a, b) => a.word_start - b.word_start);
     return `
-## Metadata
-${this._renderMetadata(feedEntry)}
-## Highlights
-${annotations.map(this._renderAnnotation).join("\n")}
-`.trim();
+      ## Metadata
+      ${this._renderMetadata(feedEntry)}
+      ## Highlights
+      ${annotations.map(this._renderAnnotation).join("\n")}
+      `.trim();
   }
 
   private _renderMetadata(feedEntry: FeedEntry): string {
 
     if (this.settings.metadataTemplate) {
       const template = this.settings.metadataTemplate;
-      return template
-        .replace('{{url}}', feedEntry.content.url)
-        .replace('{{publication_date}}', (feedEntry.content.publication_date && new Date(feedEntry.content.publication_date).toISOString().slice(0, 10) || '')
-        .replace('{{author}}', feedEntry.content.author.any_name)
-        .replace('{{title}}', feedEntry.content.title)
-        .replace('{{tags}}', feedEntry.content.tags.map((t: { name: string }) => `#${t.name.split(' ').join('_')}`).join(' ')));
+      let metadata = template
+        .replace(/{{title}}/g, `${[[feedEntry.content.title]]}`)
+        .replace(/{{author}}/g, `${[[feedEntry.content.author?.any_name]]}` || '')
+        .replace(/{{url}}/g, `[${feedEntry.content.title}](${feedEntry.content.url})`)
+        .replace(/{{publication_date}}/g, `${(feedEntry.content.publication_date && new Date(feedEntry.content.publication_date).toISOString().slice(0, 10) || '')}`
+        .replace(/{{tags}}/g, feedEntry.content.tags.length ? feedEntry.content.tags.map((t: { name: string }) => `#${t.name.split(' ').join('_')}`).join(' ') : ''));
+      metadata += '\n';
+      return metadata;
     } else {
       let metadata = `* URL: [${feedEntry.content.url}](${feedEntry.content.url})`;
       if (feedEntry.content.publication_date) {
