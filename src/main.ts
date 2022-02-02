@@ -33,6 +33,14 @@ export default class MatterPlugin extends Plugin {
     this.registerInterval(window.setInterval(async () => {
       await this.loopSync();
     }, LOOP_SYNC_INTERVAL));
+
+    this.addCommand({
+      id: 'matter-sync',
+      name: 'Sync',
+      callback: () => {
+        this.sync();
+      },
+    })
   }
 
   onunload() {
