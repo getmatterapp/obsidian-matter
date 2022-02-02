@@ -226,6 +226,13 @@ ${annotations.map(this._renderAnnotation).join("\n")}
       metadata += `\n* Publisher: [[${feedEntry.content.publisher.any_name}]]`;
     }
 
+    if (feedEntry.content.tags.length != 0) {
+      metadata += `\n* Tags:`
+      for (const tag of feedEntry.content.tags) {
+        metadata += ` [[${tag.name}]]`
+      }
+    }
+
     metadata += '\n';
     return metadata;
   }
