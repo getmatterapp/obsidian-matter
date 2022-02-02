@@ -21,8 +21,13 @@ export interface Author {
   any_name: string | null;
 }
 
+export interface Publisher {
+  any_name: string | null;
+}
+
 export interface Content {
   author: Author;
+  publisher: Publisher;
   my_annotations: Annotation[];
   publication_date: string;
   title: string;
