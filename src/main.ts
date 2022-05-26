@@ -162,6 +162,7 @@ export default class MatterPlugin extends Plugin {
 
     const entryName = await this._generateEntryName(feedEntry);
     const entryPath = this._getPath(entryName);
+
     if (await fs.exists(entryPath)) {
       const after = new Date(this.settings.lastSync);
       const content = await fs.read(entryPath);
@@ -170,8 +171,13 @@ export default class MatterPlugin extends Plugin {
         await fs.write(entryPath, newContent);
       }
     } else {
-      await fs.write(entryPath, this._renderFeedEntry(feedEntry));
+      if (!this.settings.contentMap[entryName] || this.settings.recreateIfMissing) {
+        await fs.write(entryPath, this._renderFeedEntry(feedEntry));
+      }
     }
+
+    this.settings.contentMap[entryName] = feedEntry.id;
+    await this.saveSettings();
   }
 
   private _getPath(name: string){
@@ -190,8 +196,6 @@ export default class MatterPlugin extends Plugin {
       name = `${toFilename(feedEntry.content.title)}-${i}.md`;
     }
 
-    this.settings.contentMap[name] = feedEntry.id;
-    await this.saveSettings();
     return name;
   }
 

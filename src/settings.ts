@@ -29,6 +29,7 @@ export interface MatterSettings {
   lastSync: Date | null;
   isSyncing: boolean;
   contentMap: ContentMap
+  recreateIfMissing: boolean;
 }
 
 export const DEFAULT_SETTINGS: MatterSettings = {
@@ -41,6 +42,7 @@ export const DEFAULT_SETTINGS: MatterSettings = {
   lastSync: null,
   isSyncing: false,
   contentMap: {},
+  recreateIfMissing: true,
 }
 
 export class MatterSettingsTab extends PluginSettingTab {
@@ -204,6 +206,17 @@ export class MatterSettingsTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
+
+    new Setting(containerEl)
+        .setName('Always Recreate Missing Files')
+        .setDesc('If enabled, a sync will re-create missing entries in your vault')
+        .addToggle(toggle => toggle
+          .setValue(this.plugin.settings.recreateIfMissing)
+          .onChange(async (val) => {
+            this.plugin.settings.recreateIfMissing = val;
+            await this.plugin.saveSettings();
+          })
+        )
 
     new Setting(containerEl)
       .setName('Sync Now')
