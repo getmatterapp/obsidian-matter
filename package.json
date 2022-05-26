@@ -1,6 +1,6 @@
 {
 	"name": "matter",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "The Matter Obsidian Plugin",
 	"main": "main.js",
 	"scripts": {
