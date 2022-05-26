@@ -40,7 +40,7 @@ export default class MatterPlugin extends Plugin {
       callback: () => {
         this.sync();
       },
-    })
+    });
   }
 
   onunload() {
