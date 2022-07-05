@@ -5,6 +5,7 @@ import {
   Notice,
   PluginSettingTab,
   Setting,
+  TFolder,
 } from 'obsidian';
 import QRious from 'qrious';
 import {
@@ -155,42 +156,70 @@ export class MatterSettingsTab extends PluginSettingTab {
         .setValue(newDataDir)
         .onChange(async (value) => {
           value = value.replace(/^\/+|\/+$/g, '');
-          newDataDir = value
-        }))
-        .addButton(button => button
-          .setButtonText('Apply')
-          .setClass('matter-folder-button')
-          .onClick(async () => {
-            if (newDataDir === this.plugin.settings.dataDir) {
-              return;
+          newDataDir = normalizePath(value)
+        })
+      )
+      .addButton(button => button
+        .setButtonText('Apply')
+        .setClass('matter-folder-button')
+        .onClick(async () => {
+          const vault = this.plugin.app.vault;
+          const oldDataDir = this.plugin.settings.dataDir;
+
+          if (newDataDir === oldDataDir) {
+            return;
+          }
+
+          if (this.plugin.settings.isSyncing) {
+            new Notice("Wait for the current sync to end and try again.")
+            return;
+          }
+
+          // Temporarily disable sync
+          this.plugin.settings.isSyncing = true;
+          await this.plugin.saveSettings();
+
+          // Copy over the current data to the new vault location
+          try {
+            button.setButtonText('Migrating...')
+            button.setDisabled(true);
+
+            if (!vault.getAbstractFileByPath(newDataDir)) {
+              await vault.createFolder(newDataDir);
             }
 
-            if (this.plugin.settings.isSyncing) {
-              new Notice("Wait for the current sync to end and try again.")
-              return;
+            const contentKeys = Object.keys(this.plugin.settings.contentMap);
+            const files = this.plugin.app.vault.getFiles().filter(f => f.parent.path === oldDataDir && contentKeys.includes(f.name));
+            const copies = files.map(file => vault.copy(file, `${newDataDir}/${file.name}`));
+            await Promise.all(copies);
+
+            const deletes = files.map(file => vault.delete(file));
+            await Promise.all(deletes);
+
+            // If the old data folder is empty, go ahead and remove it as well
+            const oldFolder = vault.getAbstractFileByPath(oldDataDir) as TFolder;
+            if (oldFolder.children.length === 0) {
+              await vault.delete(oldFolder);
             }
-
-            // Temporarily disable sync
-            this.plugin.settings.isSyncing = true;
-            await this.plugin.saveSettings();
-
-            // Copy over the current data to the new vault location
-            const fs = this.plugin.app.vault.adapter;
-            try {
-              await fs.rename(this.plugin.settings.dataDir, newDataDir);
-            } catch(e) {
-              new Notice(e.message);
-              this.plugin.settings.isSyncing = false;
-              await this.plugin.saveSettings();
-              return;
-            }
-
-            // Re-enable sync and persist setting
-            this.plugin.settings.dataDir = normalizePath(newDataDir);
+          } catch(e) {
+            console.error(e);
+            new Notice(e.message);
             this.plugin.settings.isSyncing = false;
             await this.plugin.saveSettings();
-            new Notice("Sync folder updated")
-          }));
+            button.setButtonText('Apply')
+            button.setDisabled(false);
+            return;
+          }
+
+          // Re-enable sync and persist setting
+          this.plugin.settings.dataDir = newDataDir;
+          this.plugin.settings.isSyncing = false;
+          await this.plugin.saveSettings();
+          new Notice("Sync folder updated")
+          button.setButtonText('Apply')
+          button.setDisabled(false);
+        })
+      );
 
     new Setting(containerEl)
       .setName('Sync Frequency')
