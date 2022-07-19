@@ -197,7 +197,7 @@ export class MatterSettingsTab extends PluginSettingTab {
 
             // If the old data folder is empty, go ahead and remove it as well
             const oldFolder = vault.getAbstractFileByPath(oldDataDir) as TFolder;
-            if (oldFolder.children.length === 0) {
+            if (oldFolder && oldFolder.children.length === 0) {
               await vault.delete(oldFolder);
             }
           } catch(e) {
