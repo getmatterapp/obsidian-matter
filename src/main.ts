@@ -224,14 +224,27 @@ ${annotations.map(this._renderAnnotation).join("\n")}
 
   private _renderMetadata(feedEntry: FeedEntry): string {
     let metadata = `* URL: [${feedEntry.content.url}](${feedEntry.content.url})`;
+
+    if (feedEntry.content.author) {
+      metadata += `\n* Author: [[${feedEntry.content.author.any_name}]]`;
+    }
+
+    if (feedEntry.content.publisher) {
+      metadata += `\n* Publisher: [[${feedEntry.content.publisher.any_name}]]`;
+    }
+
     if (feedEntry.content.publication_date) {
       const publicationDate = new Date(feedEntry.content.publication_date);
       const publicationDateStr = publicationDate.toISOString().slice(0, 10);
       metadata += `\n* Published Date: ${publicationDateStr}`;
     }
 
-    if (feedEntry.content.author) {
-      metadata += `\n* Author: [[${feedEntry.content.author.any_name}]]`;
+    if (feedEntry.content.my_note && feedEntry.content.my_note.note) {
+      metadata += `\n* Note: ${feedEntry.content.my_note.note}`;
+    }
+
+    if (feedEntry.content.tags.length) {
+      metadata += `\n* Tags: ${feedEntry.content.tags.map(t => `#${t.name.replace(/\s/g, '_')}`).join(', ')}`
     }
 
     metadata += '\n';
