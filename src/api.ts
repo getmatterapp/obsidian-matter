@@ -21,10 +21,26 @@ export interface Author {
   any_name: string | null;
 }
 
+export interface ContentNote {
+  note: string;
+}
+
+export interface Publisher {
+  any_name: string | null;
+}
+
+export interface Tag {
+  created_date: string;
+  name: string;
+}
+
 export interface Content {
   author: Author;
+  publisher: Publisher;
   my_annotations: Annotation[];
+  my_note: ContentNote;
   publication_date: string;
+  tags: Tag[];
   title: string;
   url: string;
 }
