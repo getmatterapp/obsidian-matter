@@ -14,6 +14,7 @@ import {
   QRLoginExchangeResponse,
 } from './api';
 import MatterPlugin from './main';
+import { HIGHLIGHT_TEMPLATE, METADATA_TEMPLATE } from './rendering';
 import { sleep } from './utils';
 
 export interface ContentMap {
@@ -31,6 +32,8 @@ export interface MatterSettings {
   isSyncing: boolean;
   contentMap: ContentMap
   recreateIfMissing: boolean;
+  metadataTemplate: string | null;
+  highlightTemplate: string | null;
 }
 
 export const DEFAULT_SETTINGS: MatterSettings = {
@@ -44,6 +47,8 @@ export const DEFAULT_SETTINGS: MatterSettings = {
   isSyncing: false,
   contentMap: {},
   recreateIfMissing: true,
+  metadataTemplate: null,
+  highlightTemplate: null,
 }
 
 export class MatterSettingsTab extends PluginSettingTab {
@@ -254,6 +259,34 @@ export class MatterSettingsTab extends PluginSettingTab {
         .onClick(async () => {
           await this.plugin.sync()
         }));
+
+    new Setting(containerEl)
+      .setName('Metadata Template')
+      .setDesc('Customize the template used to display the article\'s metadata. Supported tags: {{url}}, {{title}}, {{author}}, {{publisher}}, {{published_date}}, {{note}}, {{tags}}. To see the full templating API, visit https://mozilla.github.io/nunjucks/templating.html.')
+      .addTextArea(textarea => {
+        textarea.inputEl.style.minWidth = '480px';
+        textarea.inputEl.style.minHeight = '200px';
+        textarea
+        .setValue(this.plugin.settings.metadataTemplate || METADATA_TEMPLATE.trim())
+        .onChange(async (val) => {
+          this.plugin.settings.metadataTemplate = val;
+          await this.plugin.saveSettings();
+        });
+      })
+
+    new Setting(containerEl)
+      .setName('Highlight Template')
+      .setDesc('Customize the template used to display each highlight. Supported tags: {{text}}, {{note}}. To see the full templating API, visit https://mozilla.github.io/nunjucks/templating.html.')
+      .addTextArea(textarea => {
+        textarea.inputEl.style.minWidth = '480px';
+        textarea.inputEl.style.minHeight = '200px';
+        textarea
+        .setValue(this.plugin.settings.highlightTemplate || HIGHLIGHT_TEMPLATE.trim())
+        .onChange(async (val) => {
+          this.plugin.settings.highlightTemplate = val;
+          await this.plugin.saveSettings();
+        });
+      })
   }
 
   private async _pollQRLoginExchange() {

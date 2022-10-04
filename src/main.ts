@@ -10,12 +10,15 @@ import {
   FeedResponse,
   authedRequest,
 } from './api';
+import { LAYOUT_TEMPLATE, HIGHLIGHT_TEMPLATE, METADATA_TEMPLATE } from './rendering';
 import {
   DEFAULT_SETTINGS,
   MatterSettings,
   MatterSettingsTab
 } from './settings';
 import { toFilename } from './utils';
+import * as nunjucks from 'nunjucks';
+nunjucks.configure({trimBlocks: true, autoescape: false})
 
 const LOOP_SYNC_INTERVAL = 60 * 1000;
 
@@ -205,56 +208,65 @@ export default class MatterPlugin extends Plugin {
       return content;
     }
 
-    if (content[-1] !== '\n') {
-      content += '\n';
-    }
-
-    return content + `${newAnnotations.map(this._renderAnnotation).join('\n')}`;
+    return content.trimEnd() + '\n' + newAnnotations.map((a) => this._renderAnnotation(a)).join('');
   }
 
   private _renderFeedEntry(feedEntry: FeedEntry): string {
-    const annotations = feedEntry.content.my_annotations.sort((a, b) => a.word_start - b.word_start);
-    return `
-## Metadata
-${this._renderMetadata(feedEntry)}
-## Highlights
-${annotations.map(this._renderAnnotation).join("\n")}
-`.trim();
+    let metadata;
+    try {
+      metadata = this._renderMetadata(feedEntry);
+    } catch (error) {
+      new Notice("There was a problem with your Matter metadata template. Please update it in settings.");
+      return
+    }
+
+
+    let highlights;
+    try {
+      const annotations = feedEntry.content.my_annotations.sort((a, b) => a.word_start - b.word_start);
+      highlights = annotations.map((a) => this._renderAnnotation(a)).join('')
+    } catch (error) {
+      console.error(error)
+      new Notice("There was a problem with your Matter highlight template. Please update it in settings.");
+      return
+    }
+
+    try {
+      return nunjucks.renderString(LAYOUT_TEMPLATE.trim(), {
+        title: feedEntry.content.title,
+        metadata: metadata,
+        highlights: highlights,
+      })
+    } catch (error) {
+      new Notice("There was a problem with your Matter template. Please update it in settings.");
+    }
   }
 
   private _renderMetadata(feedEntry: FeedEntry): string {
-    let metadata = `* URL: [${feedEntry.content.url}](${feedEntry.content.url})`;
+    const template = this.settings.metadataTemplate || METADATA_TEMPLATE;
 
-    if (feedEntry.content.author) {
-      metadata += `\n* Author: [[${feedEntry.content.author.any_name}]]`;
-    }
-
-    if (feedEntry.content.publisher) {
-      metadata += `\n* Publisher: [[${feedEntry.content.publisher.any_name}]]`;
-    }
-
+    let publishedDate: string | null = null;
     if (feedEntry.content.publication_date) {
       const publicationDate = new Date(feedEntry.content.publication_date);
-      const publicationDateStr = publicationDate.toISOString().slice(0, 10);
-      metadata += `\n* Published Date: ${publicationDateStr}`;
+      publishedDate = publicationDate.toISOString().slice(0, 10);
     }
 
-    if (feedEntry.content.my_note && feedEntry.content.my_note.note) {
-      metadata += `\n* Note: ${feedEntry.content.my_note.note}`;
-    }
-
-    if (feedEntry.content.tags.length) {
-      metadata += `\n* Tags: ${feedEntry.content.tags.map(t => `#${t.name.replace(/\s/g, '_')}`).join(', ')}`
-    }
-
-    metadata += '\n';
-    return metadata;
+    return nunjucks.renderString(template.trim(), {
+      url: feedEntry.content.url,
+      title: feedEntry.content.title,
+      author: feedEntry.content.author?.any_name,
+      publisher: feedEntry.content.publisher?.any_name,
+      published_date: publishedDate,
+      note: feedEntry.content.my_note?.note,
+      tags: feedEntry.content.tags.map(t => t.name)
+    })
   }
 
   private _renderAnnotation(annotation: Annotation) {
-    return `
-* ${annotation.text}${annotation.note ? `
-  * **Note**: ${annotation.note}` : ''}
-`.trim()
+    const template = this.settings.highlightTemplate || HIGHLIGHT_TEMPLATE;
+    return nunjucks.renderString(template.trim(), {
+      text: annotation.text,
+      note: annotation.note,
+    })
   }
 }
