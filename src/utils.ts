@@ -3,5 +3,5 @@ export const sleep = (ms: number): Promise<void> => {
 }
 
 export const toFilename = (s: string): string => {
-  return s.replace(/[/\\%*|"<>#]/g, '-');
+  return s.replace(/[/\\?%*:|"<>#]/g, '-');
 }
