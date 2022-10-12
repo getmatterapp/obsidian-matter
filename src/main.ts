@@ -89,6 +89,7 @@ export default class MatterPlugin extends Plugin {
     // The settings file can change via multiple device sync. Fetch a fresh copy
     // just in case another sync is happening elsewhere.
     await this.loadSettings();
+    const initialSyncState = Object.values(this.settings.contentMap);
 
     if (this.settings.isSyncing || !this.settings.accessToken) {
       return;
@@ -99,7 +100,7 @@ export default class MatterPlugin extends Plugin {
 
     try {
       new Notice('Syncing with Matter');
-      await this._pageAnnotations();
+      await this._pageAnnotations(initialSyncState);
       this.settings.lastSync = new Date();
       new Notice('Finished syncing with Matter');
     } catch (error) {
@@ -111,7 +112,7 @@ export default class MatterPlugin extends Plugin {
     await this.saveSettings();
   }
 
-  private async _pageAnnotations() {
+  private async _pageAnnotations(initialSyncState: string[]) {
     let url = ENDPOINTS.HIGHLIGHTS_FEED;
     let feedEntries: FeedEntry[] = [];
 
@@ -125,6 +126,17 @@ export default class MatterPlugin extends Plugin {
     // Reverse the feed items so that chronological ordering is preserved.
     feedEntries = feedEntries.reverse();
     for (const feedEntry of feedEntries) {
+      // If an entry has appeared with the same id since the sync started, skip it
+      // for now. This indicates a race condition with another sync service.
+      await this.loadSettings()
+      const currentSyncState = Object.values(this.settings.contentMap);
+      if (
+        !initialSyncState.includes(feedEntry.id)
+        && currentSyncState.includes(feedEntry.id)
+      ) {
+        continue
+      }
+
       await this._handleFeedEntry(feedEntry);
     }
   }
