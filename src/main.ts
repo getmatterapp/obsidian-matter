@@ -175,9 +175,12 @@ export default class MatterPlugin extends Plugin {
       await fs.mkdir(this.settings.dataDir);
     }
 
-    const entryName = await this._generateEntryName(feedEntry);
-    const entryPath = this._getPath(entryName);
+    let entryName = Object.keys(this.settings.contentMap).find(key => this.settings.contentMap[key] === feedEntry.id);
+    if (!entryName) {
+      entryName = await this._generateEntryName(feedEntry);
+    }
 
+    const entryPath = this._getPath(entryName);
     if (await fs.exists(entryPath)) {
       const after = new Date(this.settings.lastSync);
       const content = await fs.read(entryPath);
