@@ -50,11 +50,9 @@ export interface FeedEntry {
   content: Content;
   feed_context: null;
   id: string;
-  recommendations: any[];
 }
 
 export interface FeedResponse {
-  current_profile: any;
   feed: FeedEntry[];
   id: string;
   next: string | null;
