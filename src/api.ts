@@ -34,8 +34,13 @@ export interface Tag {
   name: string;
 }
 
+export interface LibraryEntry {
+  library_state: number;
+}
+
 export interface Content {
   author: Author;
+  library: LibraryEntry | null;
   publisher: Publisher;
   my_annotations: Annotation[];
   my_note: ContentNote;

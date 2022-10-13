@@ -123,6 +123,7 @@ export default class MatterPlugin extends Plugin {
 
     // Reverse the feed items so that chronological ordering is preserved.
     feedEntries = feedEntries.reverse();
+
     for (const feedEntry of feedEntries) {
       // If an entry has appeared with the same id since the sync started, skip it
       // for now. This indicates a race condition with another sync service.
@@ -187,7 +188,11 @@ export default class MatterPlugin extends Plugin {
         await fs.write(entryPath, newContent);
       }
     } else {
-      if (!this.settings.contentMap[entryName] || this.settings.recreateIfMissing) {
+      const notDeleted = !feedEntry.content.library || !(feedEntry.content.library.library_state === 3);
+      const entryDoesNotExist = !this.settings.contentMap[entryName];
+      const recreateIfMissing = this.settings.recreateIfMissing;
+      const shouldCreate = notDeleted && (entryDoesNotExist || recreateIfMissing);
+      if (shouldCreate) {
         await fs.write(entryPath, this._renderFeedEntry(feedEntry));
       }
     }
