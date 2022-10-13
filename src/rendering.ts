@@ -1,11 +1,18 @@
-export const LAYOUT_TEMPLATE = `
+import * as nunjucks from 'nunjucks';
+
+const renderer = new nunjucks.Environment(null, {trimBlocks: true, autoescape: false})
+renderer.addFilter('date', (str, format) => {
+  return window.moment(str).format(format);
+});
+
+const LAYOUT_TEMPLATE = `
 {{metadata}}
 
 ## Highlights
 {{highlights}}
-`
+`;
 
-export const METADATA_TEMPLATE = `
+const METADATA_TEMPLATE = `
 ## Metadata
 * URL: [{{url}}](url)
 {% if author %}
@@ -15,7 +22,7 @@ export const METADATA_TEMPLATE = `
 * Publisher: {{publisher}}
 {% endif %}
 {% if published_date %}
-* Published Date: {{published_date}}
+* Published Date: {{published_date|date("YYYY-MM-DD")}}
 {% endif %}
 {% if note %}
 * Note: {{note}}
@@ -23,11 +30,18 @@ export const METADATA_TEMPLATE = `
 {% if tags %}
 * Tags: {% for tag in tags %}#{{tag | replace(' ', '_')}}{% if not loop.last %}, {% endif %}{% endfor%}
 {% endif %}
-`
+`;
 
-export const HIGHLIGHT_TEMPLATE = `
+const HIGHLIGHT_TEMPLATE = `
 * {{text}}
 {% if note %}
   * **Note**: {{note}}
 {% endif %}
-`
+`;
+
+export {
+  renderer,
+  LAYOUT_TEMPLATE,
+  METADATA_TEMPLATE,
+  HIGHLIGHT_TEMPLATE
+}

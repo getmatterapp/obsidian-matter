@@ -276,7 +276,7 @@ export class MatterSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Highlight Template')
-      .setDesc('Customize the template used to display each highlight. Supported tags: {{text}}, {{note}}. To see the full templating API, visit https://mozilla.github.io/nunjucks/templating.html.')
+      .setDesc('Customize the template used to display each highlight. Supported tags: {{text}}, {{note}}, {{created_date}}. To see the full templating API, visit https://mozilla.github.io/nunjucks/templating.html.')
       .addTextArea(textarea => {
         textarea.inputEl.style.minWidth = '480px';
         textarea.inputEl.style.minHeight = '200px';

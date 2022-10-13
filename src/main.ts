@@ -10,15 +10,13 @@ import {
   FeedResponse,
   authedRequest,
 } from './api';
-import { LAYOUT_TEMPLATE, HIGHLIGHT_TEMPLATE, METADATA_TEMPLATE } from './rendering';
+import { LAYOUT_TEMPLATE, HIGHLIGHT_TEMPLATE, METADATA_TEMPLATE, renderer } from './rendering';
 import {
   DEFAULT_SETTINGS,
   MatterSettings,
   MatterSettingsTab
 } from './settings';
 import { toFilename } from './utils';
-import * as nunjucks from 'nunjucks';
-nunjucks.configure({trimBlocks: true, autoescape: false})
 
 const LOOP_SYNC_INTERVAL = 60 * 1000;
 
@@ -247,7 +245,7 @@ export default class MatterPlugin extends Plugin {
     }
 
     try {
-      return nunjucks.renderString(LAYOUT_TEMPLATE.trim(), {
+      return renderer.renderString(LAYOUT_TEMPLATE.trim(), {
         title: feedEntry.content.title,
         metadata: metadata,
         highlights: highlights,
@@ -262,26 +260,27 @@ export default class MatterPlugin extends Plugin {
 
     let publishedDate: string | null = null;
     if (feedEntry.content.publication_date) {
-      const publicationDate = new Date(feedEntry.content.publication_date);
-      publishedDate = publicationDate.toISOString().slice(0, 10);
+      publishedDate = feedEntry.content.publication_date
     }
 
-    return nunjucks.renderString(template.trim(), {
-      url: feedEntry.content.url,
-      title: feedEntry.content.title,
+    return renderer.renderString(template.trim(), {
       author: feedEntry.content.author?.any_name,
-      publisher: feedEntry.content.publisher?.any_name,
-      published_date: publishedDate,
       note: feedEntry.content.my_note?.note,
-      tags: feedEntry.content.tags.map(t => t.name)
+      published_date: publishedDate,
+      publisher: feedEntry.content.publisher?.any_name,
+      tags: feedEntry.content.tags.map(t => t.name),
+      title: feedEntry.content.title,
+      url: feedEntry.content.url,
     })
   }
 
   private _renderAnnotation(annotation: Annotation) {
     const template = this.settings.highlightTemplate || HIGHLIGHT_TEMPLATE;
-    return nunjucks.renderString(template.trim(), {
+
+    return renderer.renderString(template.trim(), {
       text: annotation.text,
       note: annotation.note,
+      created_date: annotation.created_date,
     })
   }
 }
