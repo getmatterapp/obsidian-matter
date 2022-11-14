@@ -51,7 +51,7 @@ export const DEFAULT_SETTINGS: MatterSettings = {
   dataDir: "Matter",
   syncInterval: 60,
   syncOnLaunch: true,
-  notifyOnSync: "always",
+  notifyOnSync: SyncNotificationPreference.ALWAYS,
   hasCompletedInitialSetup: false,
   lastSync: null,
   isSyncing: false,
