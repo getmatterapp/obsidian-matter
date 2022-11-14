@@ -21,12 +21,20 @@ export interface ContentMap {
   [key: string]: string;
 }
 
+export enum SyncNotificationPreference {
+  NEVER = 'never',
+  ERROR = 'error',
+  ALWAYS = 'always',
+}
+
 export interface MatterSettings {
   accessToken: string | null;
   refreshToken: string | null;
   qrSessionToken: string | null;
   dataDir: string | null;
   syncInterval: number;
+  syncOnLaunch: boolean;
+  notifyOnSync: SyncNotificationPreference;
   hasCompletedInitialSetup: boolean;
   lastSync: Date | null;
   isSyncing: boolean;
@@ -42,6 +50,8 @@ export const DEFAULT_SETTINGS: MatterSettings = {
   qrSessionToken: null,
   dataDir: "Matter",
   syncInterval: 60,
+  syncOnLaunch: true,
+  notifyOnSync: "always",
   hasCompletedInitialSetup: false,
   lastSync: null,
   isSyncing: false,
@@ -229,6 +239,7 @@ export class MatterSettingsTab extends PluginSettingTab {
       .setName('Sync Frequency')
       .setDesc('How often should Obsidian sync with Matter?')
       .addDropdown(dropdown => dropdown
+        .addOption("0", "Manual")
         .addOption("30", "Every half hour")
         .addOption("60", "Every hour")
         .addOption("720", "Every 12 hours")
@@ -236,6 +247,31 @@ export class MatterSettingsTab extends PluginSettingTab {
         .setValue(this.plugin.settings.syncInterval.toString())
         .onChange(async (val) => {
           this.plugin.settings.syncInterval = parseInt(val, 10);
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName('Sync on launch')
+      .setDesc('If enabled, a sync will begin when Obsidian launches')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.syncOnLaunch)
+        .onChange(async (val) => {
+          this.plugin.settings.syncOnLaunch = val;
+          await this.plugin.saveSettings();
+        })
+      )
+
+    new Setting(containerEl)
+      .setName('Notify on sync')
+      .setDesc('When do you want to see sync notifications?')
+      .addDropdown(dropdown => dropdown
+        .addOption(SyncNotificationPreference.ALWAYS, "Always")
+        .addOption(SyncNotificationPreference.ERROR, "On error")
+        .addOption(SyncNotificationPreference.NEVER, "Never")
+        .setValue(this.plugin.settings.notifyOnSync)
+        .onChange(async (val) => {
+          this.plugin.settings.notifyOnSync = val as SyncNotificationPreference;
           await this.plugin.saveSettings();
         })
       );

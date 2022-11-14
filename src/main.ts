@@ -14,7 +14,8 @@ import { LAYOUT_TEMPLATE, HIGHLIGHT_TEMPLATE, METADATA_TEMPLATE, renderer } from
 import {
   DEFAULT_SETTINGS,
   MatterSettings,
-  MatterSettingsTab
+  MatterSettingsTab,
+  SyncNotificationPreference
 } from './settings';
 import { toFilename } from './utils';
 
@@ -27,8 +28,10 @@ export default class MatterPlugin extends Plugin {
     await this.loadSettings();
     this.addSettingTab(new MatterSettingsTab(this.app, this));
 
-    // Call in parallel to avoid long loading times.
-    this.initialSync();
+    if (this.settings.syncOnLaunch) {
+      // Call in parallel to avoid long loading times.
+      this.initialSync();
+    }
 
     // Set up sync interval
     this.registerInterval(window.setInterval(async () => {
@@ -77,6 +80,7 @@ export default class MatterPlugin extends Plugin {
     if (
       this.settings.accessToken
       && this.settings.hasCompletedInitialSetup
+      && mssyncInterval > 0
       && msSinceLastSync >= mssyncInterval
     ) {
       this.sync();
@@ -97,13 +101,19 @@ export default class MatterPlugin extends Plugin {
     await this.saveSettings();
 
     try {
-      new Notice('Syncing with Matter');
+      if (this.settings.notifyOnSync === SyncNotificationPreference.ALWAYS) {
+        new Notice('Syncing with Matter');
+      }
       await this._pageAnnotations(initialSyncState);
       this.settings.lastSync = new Date();
-      new Notice('Finished syncing with Matter');
+      if (this.settings.notifyOnSync === SyncNotificationPreference.ALWAYS) {
+        new Notice('Finished syncing with Matter');
+      }
     } catch (error) {
       console.error(error);
-      new Notice('There was a problem syncing with Matter, try again later.');
+      if (this.settings.notifyOnSync !== SyncNotificationPreference.NEVER) {
+        new Notice('There was a problem syncing with Matter, try again later.');
+      }
     }
 
     this.settings.isSyncing = false;
